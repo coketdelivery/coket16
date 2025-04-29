@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>코켓배송 - 타자게임</title>
+  <style>
+    /* 모바일 최적화 전체 설정 */
+    html, body {
+      height: 100vh; width: 100vw; margin: 0; padding: 0;
+      overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none;
+      font-family: 'Arial', sans-serif;
+      background: url('1.jpg') no-repeat center/cover;
+    }
+    button { cursor: pointer; }
+
+    /* 인트로 & 게임오버 */
+    #introScreen, #gameOverScreen {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255,255,255,0.95);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 5vw; box-sizing: border-box; z-index: 2000;
+    }
+    #introScreen h1, #gameOverScreen h1 {
+      font-size: 8vw; margin: 1vh 0; line-height: 1.2;
+    }
+    #introScreen p, #gameOverScreen p,
+    #introScreen a, #gameOverScreen a {
+      font-size: 4vw; margin: 1vh 0; color: #333;
+      word-break: break-all;
+    }
+    #startBtn, #retryBtn {
+      margin-top: 4vh; font-size: 5vw; padding: 3vw 5vw;
+      background: #ff6b6b; color: #fff; border: none; border-radius: 2vw;
+    }
+
+    /* 게임 화면 숨김 */
+    #gameArea, #info, #inputArea, #levelUp { visibility: hidden; }
+
+    /* 게임 영역 */
+    #gameArea {
+      position: relative; width: 100%; height: 100%; overflow: hidden;
+    }
+    .word {
+      position: absolute; /* left, top 초기값은 JS에서 설정 */
+      font-size: 5vw; padding: 1vw;
+      background: rgba(255,255,255,0.8); border-radius: 1vw;
+      will-change: left;
+      animation: slide linear forwards;
+    }
+    @keyframes slide {
+      /* 오른쪽에서 왼쪽으로 이동 */
+      0% { left: 100%; }
+      100% { left: -150px; }
+    }
+
+    /* 정보 표시 */
+    #info {
+      position: fixed;
+      /* 두 줄(≈8vw) 만큼 아래로 이동 */
+      top: calc(env(safe-area-inset-top,2vh) + 8vw);
+      left: env(safe-area-inset-left,2vw);
+      font-size: 4vw; color: #fff; background: rgba(0,0,0,0.3);
+      padding: 1vw; border-radius: 1vw;
+    }
+
+    /* 레벨업 표시 */
+    #levelUp {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      font-size: 12vw; color: #fff; background: rgba(0,0,0,0.5);
+      padding: 3vw 5vw; border-radius: 3vw; display: none; z-index: 1001;
+    }
+
+    /* 입력 영역 고정 */
+    #inputArea {
+      position: fixed; bottom: env(safe-area-inset-bottom,5vh); width: 100%; text-align: center;
+      background: rgba(0,0,0,0.2);
+      padding: 2vh 0;
+    }
+    #inputForm {
+      display: inline-block; width: 90vw; max-width: 500px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      border-radius: 2vw;
+      background: #fff;
+    }
+    #userInput {
+      width: 100%; font-size: 6vw; padding: 2vw;
+      border: none; border-radius: 2vw;
+      outline: none;
+      autocorrect: off; autocapitalize: off; spellcheck: false;
+    }
+
+    /* 데스크탑 대응 */
+    @media (min-width: 768px) {
+      .word { font-size: 24px; padding: 5px 10px; border-radius: 8px; }
+      #userInput { font-size: 24px; padding: 10px; }
+      #info { font-size: 18px; padding: 8px; }
+      #levelUp { font-size: 48px; padding: 20px 40px; border-radius: 20px; }
+      #introScreen h1, #gameOverScreen h1 { font-size: 48px; }
+      #introScreen p, #gameOverScreen p,
+      #introScreen a, #gameOverScreen a { font-size: 18px; }
+      #startBtn, #retryBtn { font-size: 24px; padding: 10px 20px; border-radius: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="introScreen">
+    <h1>❤️ 코켓배송 - 타자게임 🚚</h1>
+    <p>최초 11개의 목숨이며, 각 라운드를 넘을 때마다 1개 목숨이 늘어납니다.</p>
+    <p>라운드별 40초입니다.</p>
+    <p>라이프가 끝나면 게임은 종료됩니다.</p>
+    <p>유튜브 '걸코_Gulko' 저작권 콘텐츠입니다.</p>
+    <p>© 2025 코켓게임즈. All rights reserved.</p>
+    <a href="https://www.youtube.com/@Gulko" target="_blank">https://www.youtube.com/@Gulko</a>
+    <button id="startBtn">게임 시작</button>
+  </div>
+  <div id="gameOverScreen" style="display:none;">
+    <h1>게임 오버! 😢</h1>
+    <p>코팡 구입은 걸코와 함께</p>
+    <a href="https://www.youtube.com/@Gulko" target="_blank">https://www.youtube.com/@Gulko</a>
+    <p>사랑합니다. 고객님</p>
+    <button id="retryBtn">다시 시작</button>
+  </div>
+  <div id="gameArea"></div>
+  <div id="info">난이도: 1 | 목숨: 10 | 스코어: 0 | 시간: 00:00</div>
+  <div id="levelUp"></div>
+  <div id="inputArea">
+    <form id="inputForm">
+      <input type="text" id="userInput" placeholder="단어 입력..." autocomplete="off">
+    </form>
+  </div>
+
+  <audio id="bgm" src="2.mp3" loop></audio>
+  <audio id="wrongSound" src="1.mp3"></audio>
+  <audio id="correctSound" src="4.mp3"></audio>
+  <audio id="gameOverSound" src="3.mp3"></audio>
+  <audio id="lifeLostSound" src="5.mp3"></audio>
+
+  <script>
+    const words = [
+      "마","장래희망","걸코가","망상이","빵이","문수","니장래희망걸코가","미스터라떼","쑤아릿","소리질럿",
+      "아아쌔쌔","샤바라","함치고","상관없죠","니","아르헨티나","내가","잘못했는데","니쥬디","사랑합니다",
+      "고객님","고객은왕이다","코켓배송","마쬬","니니니","원투원투","찡기자","바다하늘걸코가","까르띠에","양진성양진성",
+      "롯데여신","꿀백신","아코너마돼","꿀덩어리은진","야신아랑","롯데여신","대단하네","마카롱신크롱","하나님","눈에비",
+      "거짓은거짓을","이이주니","콩언니","지아","델루나","바다하늘","대리석","신뚱","룩셈부르크","이이주니",
+      "제로드여친","여울","김태영","땡초","커피","깨비","초콜릿","순대국밥","상호","유미박",
+      "걸코아이가","초록","장나니","봄이","쉿고향","지원","성이름","녹색","좐리","샤샤",
+      "스마일","사과하자","더예쁜레몬","김정민","나리와모란","끼르기","걸코충","코켓게임즈","꼬라지","쩝쩝",
+      "딱지냥통수","집찾기","비비","순시미","베리","웅이아부지","소유니","희정","대리석","뽀뽀",
+      "술또야","구글쥬쥬","아니아니","부기","주니할매","꼼데","벼리","응자기소개","김천억","창자리본"
+    ];
+    const gameArea = document.getElementById('gameArea');
+    const info = document.getElementById('info');
+    const levelUpEl = document.getElementById('levelUp');
+    const intro = document.getElementById('introScreen');
+    const over = document.getElementById('gameOverScreen');
+    const bgm = document.getElementById('bgm');
+    const wrongSound = document.getElementById('wrongSound');
+    const correctSound = document.getElementById('correctSound');
+    const gameOverSound = document.getElementById('gameOverSound');
+    const lifeLostSound = document.getElementById('lifeLostSound');
+
+    let userInput, currentWords = [], life = 10, level = 1, score = 0;
+    let createInterval, timerInterval, levelTimeout, startTime;
+    let isGameOver = false;
+    const intervalDecrement = 30;
+    let animationBase = 15000; // 첫 라운드 15초
+
+    function formatTime(ms) {
+      const s = Math.floor(ms / 1000);
+      return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+    }
+
+    function updateInfo() {
+      info.textContent = `난이도: ${level} | 목숨: ${life} | 스코어: ${score} | 시간: ${formatTime(Date.now()-startTime)}`;
+    }
+
+    function playWrong() { wrongSound.currentTime=0; wrongSound.play(); }
+    function playCorrect() { correctSound.currentTime=0; correctSound.play(); }
+    function playLifeLost() { lifeLostSound.currentTime=0; lifeLostSound.play(); }
+    function playGameOver() { gameOverSound.currentTime=0; gameOverSound.play(); }
+
+    function showLevelUp(lv) {
+      levelUpEl.textContent = `레벨 ${lv}`;
+      levelUpEl.style.display='block'; life++; updateInfo();
+      setTimeout(()=> levelUpEl.style.display='none',1500);
+    }
+
+    function createWord() {
+      if(isGameOver) return;
+      const text = words[Math.floor(Math.random()*words.length)];
+      const lanes=6;
+      const occupied=currentWords.map(w=>w.lane);
+      const free=Array.from({length:lanes},(_,i)=>i).filter(i=>!occupied.includes(i));
+      if(!free.length) return;
+      const lane=free[Math.floor(Math.random()*free.length)];
+      const el=document.createElement('div'); el.className='word';
+      const y0=window.innerHeight*0.4, y1=window.innerHeight*0.8;
+      el.style.top=`${y0 + (y1-y0)*(lane/(lanes-1))}px`;
+      // 오른쪽에서 시작
+      el.style.left='100%';
+      el.textContent=text; gameArea.appendChild(el);
+      const dur=Math.max(1000,animationBase - (level-1)*500);
+      el.style.animationDuration=`${dur}ms`;
+      el.addEventListener('animationend',()=>{
+        if(gameArea.contains(el)){
+          gameArea.removeChild(el);
+          currentWords=currentWords.filter(w=>w.el!==el);
+          life--; playLifeLost(); updateInfo(); checkGameOver();
+        }
+      });
+      currentWords.push({el,text,lane});
+    }
+
+    function showGameOver() {
+      isGameOver=true; clearInterval(createInterval);clearInterval(timerInterval);clearTimeout(levelTimeout);
+      currentWords.forEach(w=>w.el&&w.el.remove()); currentWords=[];
+      ['gameArea','info','inputArea','levelUp'].forEach(id=>document.getElementById(id).style.visibility='hidden');
+      bgm.pause();bgm.currentTime=0;playGameOver();over.style.display='flex';
+    }
+
+    function checkGameOver(){ if(life<=0) showGameOver(); }
+
+    function startGame() {
+      isGameOver=false; startTime=Date.now(); bgm.play(); updateInfo();
+      timerInterval=setInterval(updateInfo,1000);
+      (function nextLevel(){
+        if(isGameOver) return; showLevelUp(level);
+        createInterval=setInterval(createWord,Math.max(500,2000-level*intervalDecrement));
+        levelTimeout=setTimeout(()=>{
+          clearInterval(createInterval); currentWords.forEach(w=>w.el&&w.el.remove()); currentWords=[];
+          level++; updateInfo(); nextLevel();
+        },40000);
+      })();
+    }
+
+    function bindInput(){
+      userInput=document.getElementById('userInput');
+      document.getElementById('inputForm').addEventListener('submit',e=>{
+        e.preventDefault(); const val=userInput.value.trim(); if(!val) return;
+        const idx=currentWords.findIndex(w=>w.text===val);
+        if(idx>-1){ playCorrect(); const w=currentWords[idx]; w.el.remove(); currentWords.splice(idx,1); score++; updateInfo(); }
+        else playWrong(); userInput.value='';
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded',()=>{
+      bindInput();
+      document.getElementById('startBtn').onclick=()=>{
+        over.style.display='none'; intro.style.display='none';
+        ['gameArea','info','inputArea','levelUp'].forEach(id=>document.getElementById(id).style.visibility='visible');
+        life=10; level=1; score=0; animationBase=15000; updateInfo(); startGame();
+      };
+      document.getElementById('retryBtn').onclick=()=>{
+        over.style.display='none'; clearInterval(createInterval);clearInterval(timerInterval);clearTimeout(levelTimeout);
+        currentWords.forEach(w=>w.el&&w.el.remove()); gameArea.innerHTML=''; levelUpEl.style.display='none';
+        life=10; level=1; score=0; animationBase=15000; ['gameArea','info','inputArea','levelUp'].forEach(id=>document.getElementById(id).style.visibility='visible');
+        updateInfo(); startGame();
+      };
+    });
+  </script>
+</body>
+</html>
